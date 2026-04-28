@@ -1,0 +1,174 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Snail Type</title>
+    <style>
+        body {font-family: Arial; text-align: center; background-color: #f0f0f0;}
+        #text {font-size: 24px; color: #333; margin-top: 20px; max-width: 800px; margin-left: auto; margin-right: auto;}
+        #input {font-size: 18px; padding: 10px; width: 80%; max-width: 600px; margin-top: 20px;}
+        #generate {font-size: 16px; padding: 10px 20px; margin-top: 20px; cursor: pointer;}
+        #timer {margin-top: 20px; font-size: 18px; color: #555;}
+        #leaderboard {margin-top: 24px; max-width: 800px; margin-left: auto; margin-right: auto; text-align: left;}
+        #leaderboard h2 {margin: 20px 0 10px; font-size: 20px; color: #222;}
+        #leaderboardList {padding-left: 20px; color: #333; text-align: left;}
+        #leaderboardList li {margin-bottom: 8px;}
+        #result {margin-top: 20px; font-size: 20px; color: #333;}
+    </style>
+</head>
+<body>
+    <h1>Snail Type</h1>
+    <button id="generate">Refresh Words</button>
+    <button id="newTest" style="display:none;">Start New Test</button>
+    <p>
+        <label for="playerName">Name:</label>
+        <input type="text" id="playerName" placeholder="Your name" value="Anonymous" style="margin-left: 8px; padding: 8px 10px; font-size: 16px; width: 180px; max-width: 100%;" />
+    </p>
+    <p>
+        <label for="wordCountSelect">Words:</label>
+        <select id="wordCountSelect" style="margin-left: 8px; padding: 8px 10px; font-size: 16px; width: 130px; max-width: 100%;">
+            <option value="5">5 words</option>
+            <option value="10">10 words</option>
+            <option value="15">15 words</option>
+            <option value="20" selected>20 words</option>
+        </select>
+    </p>
+    <p id="timer">Time: 0.0s</p>
+    <p id="text"></p>
+    <input type="text" placeholder="Start Typing..." id="input" autocomplete="off">
+    <p id="result"></p>
+
+    <section id="leaderboard">
+        <h2>Leaderboard</h2>
+        <ol id="leaderboardList"></ol>
+        <button id="clearLeaderboard" style="margin-top: 12px; font-size: 14px; padding: 8px 14px; cursor: pointer;">Clear Leaderboard</button>
+    </section>
+
+    <script>
+        const input = document.getElementById("input");
+        const textElement = document.getElementById("text");
+        const result = document.getElementById("result");
+        const timerElement = document.getElementById("timer");
+        const playerNameInput = document.getElementById("playerName");
+        const wordCountSelect = document.getElementById("wordCountSelect");
+        const leaderboardList = document.getElementById("leaderboardList");
+        const clearLeaderboardButton = document.getElementById("clearLeaderboard");
+        const generateButton = document.getElementById("generate");
+        const newTestButton = document.getElementById("newTest");
+
+        let timerInterval;
+
+        const wordList = [
+            "apple", "banana", "river", "cloud", "mirror", "question", "market", "planet", "winter", "garden",
+            "music", "orange", "castle", "pencil", "purple", "silver", "friend", "street", "coffee", "window",
+            "future", "movie", "summer", "gloves", "yellow", "middle", "stone", "forest", "ocean", "school",
+            "doctor", "snake", "shadow", "restaurant", "canvas", "laptop", "guitar", "rocket", "picture", "blanket",
+            "whisper", "jacket", "button", "light", "animal", "family", "sunset", "river", "signal", "garden"
+        ];
+
+        let currentText = "";
+        let startTime;
+
+        function getRandomWords(count) {
+            const randomWords = [];
+            for (let i = 0; i < count; i++) {
+                const index = Math.floor(Math.random() * wordList.length);
+                randomWords.push(wordList[index]);
+            }
+            return randomWords.join(" ");
+        }
+
+        function updateTimer() {
+            const elapsed = (new Date() - startTime) / 1000;
+            timerElement.innerText = "Time: " + elapsed.toFixed(1) + "s";
+        }
+
+        function getLeaderboard() {
+            const stored = localStorage.getItem("snailTypeLeaderboard");
+            return stored ? JSON.parse(stored) : [];
+        }
+
+        function saveLeaderboard(entries) {
+            localStorage.setItem("snailTypeLeaderboard", JSON.stringify(entries));
+        }
+
+        function renderLeaderboard() {
+            const entries = getLeaderboard();
+            if (entries.length === 0) {
+                leaderboardList.innerHTML = '<li>No scores yet</li>';
+                return;
+            }
+            leaderboardList.innerHTML = entries
+                .slice(0, 5)
+                .map(entry => `<li>${entry.name} — ${entry.wpm} WPM in ${entry.time.toFixed(1)}s</li>`)
+                .join("");
+        }
+
+        function recordScore(wpm, timeTaken) {
+            const name = playerNameInput.value.trim() || "Anonymous";
+            const entries = getLeaderboard();
+            entries.push({ name, wpm, time: timeTaken });
+            entries.sort((a, b) => {
+                if (b.wpm !== a.wpm) return b.wpm - a.wpm;
+                return a.time - b.time;
+            });
+            saveLeaderboard(entries.slice(0, 10));
+            renderLeaderboard();
+        }
+
+        function finishTest() {
+            if (timerInterval) {
+                clearInterval(timerInterval);
+                timerInterval = null;
+            }
+            const endTime = new Date();
+            const timeTaken = (endTime - startTime) / 1000;
+            const words = currentText.split(" ").length;
+            const wpm = Math.round((words / timeTaken) * 60);
+            result.innerText = "Your typing speed is " + wpm + " WPM";
+            newTestButton.style.display = "inline-block";
+            input.disabled = true;
+            recordScore(wpm, timeTaken);
+        }
+
+        function startNewTest() {
+            const wordCount = parseInt(wordCountSelect.value, 10) || 20;
+            currentText = getRandomWords(wordCount);
+            textElement.innerText = currentText;
+            input.value = "";
+            result.innerText = "";
+            startTime = null;
+            if (timerInterval) {
+                clearInterval(timerInterval);
+                timerInterval = null;
+            }
+            timerElement.innerText = "Time: 0.0s";
+            input.disabled = false;
+            newTestButton.style.display = "none";
+            input.focus();
+        }
+
+        input.addEventListener("input", () => {
+            if (!startTime) {
+                startTime = new Date();
+                timerInterval = setInterval(updateTimer, 100);
+            }
+            const typed = input.value;
+            if (typed === currentText) {
+                finishTest();
+            }
+        });
+
+        clearLeaderboardButton.addEventListener("click", () => {
+            localStorage.removeItem("snailTypeLeaderboard");
+            renderLeaderboard();
+        });
+
+        generateButton.addEventListener("click", startNewTest);
+        newTestButton.addEventListener("click", startNewTest);
+        renderLeaderboard();
+        startNewTest();
+    </script>
+</body>
+</html>
